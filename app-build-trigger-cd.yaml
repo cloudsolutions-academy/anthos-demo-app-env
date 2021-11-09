@@ -1,0 +1,62 @@
+#Contionous Delivery Pipeline Template
+
+steps:
+
+# Build the container image.
+- name: 'gcr.io/cloud-builders/docker'
+  id: Build
+  args:
+  - 'build'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/demoapp:$SHORT_SHA'
+  - '.'
+
+# Push image to gcr.io Artifact Registry
+# The SHORT_SHA variables is automatically replaced by Cloud Build.
+- name: 'gcr.io/cloud-builders/docker'
+  id: Push
+  args:
+  - 'push'
+  - 'gcr.io/$PROJECT_ID/hello-cloudbuild:$SHORT_SHA'
+
+
+# This step clones the demo-app-env repository and checks out 
+# staging branch
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Clone demo app environment repository
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+    gcloud source repos clone demo-app-env && \
+    cd demo-app-env && \
+    git checkout staging && \
+    git config user.email $(gcloud auth list --filter=status:ACTIVE --format='value(account)')
+
+# This step generates the new kubernetes.yaml manifest by replacing
+# container image based on latest commit using simple sed approach
+# For better management, you can can use tool like kustomize.
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Generate manifest
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+     sed "s/GOOGLE_CLOUD_PROJECT/${PROJECT_ID}/g" kubernetes.yaml.template | \
+     sed "s/COMMIT_SHA/${SHORT_SHA}/g" > demo-app-env/kubernetes.yaml
+
+# This step pushes the kubernetes.yaml manifest to demo-app-env branch
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Push manifest to demo-app-env branch
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+    set -x && \
+    cd demo-app-env && \
+    git add kubernetes.yaml && \
+    git commit -m "Deploying image gcr.io/${PROJECT_ID}/hello-cloudbuild:${SHORT_SHA}
+    Built from commit ${COMMIT_SHA} of repository 
+    Author: $(git log --format='%an <%ae>' -n 1 HEAD)" && \
+    git push origin staging
+
