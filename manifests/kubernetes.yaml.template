@@ -1,7 +1,6 @@
 # Sample Kubernetes Deployment Template
-# The COMMIT_SHA variable below would be replaced by the commited build image
+# The COMMIT SHA variable below would be replaced by the commited build image
 # as part of CD process.
-
 
 apiVersion: apps/v1
 kind: Deployment
@@ -9,6 +8,7 @@ metadata:
   name: demoapp
   labels:
     app: demoapp
+    businessunit: software-demo
 spec:
   replicas: 1
   selector:
@@ -18,10 +18,11 @@ spec:
     metadata:
       labels:
         app: demoapp
+        businessunit: software-demo
     spec:
       containers:
       - name: demoapp
-        image: gcr.io/GOOGLE_CLOUD_PROJECT/demoapp:COMMIT_SHA
+        image: gcr.io/anthos-book-322415/demoapp:COMMIT_SHA
         ports:
         - containerPort: 8080
 ---
